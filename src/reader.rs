@@ -7,12 +7,11 @@ use futures::{
 pub trait Reader: Sized {
     type BrokerItem: Send + 'static;
     type Ok: Send;
-    type Error: std::error::Error;
+    type Error: std::error::Error + Send;
 
-    async fn op(
-        &mut self,
-        broker: impl Sink<Self::BrokerItem>
-    ) -> Option<Result<Self::Ok, Self::Error>>;
+    async fn op(&mut self, broker: impl Sink<Self::BrokerItem>) -> Option<Result<Self::Ok, Self::Error>>;
+
+    async fn handle_result(res: Result<Self::Ok, Self::Error>);
 
     async fn reader_loop<B>(mut self, mut broker: B)
     where 
@@ -21,9 +20,7 @@ pub trait Reader: Sized {
         loop {
             match self.op(&mut broker).await {
                 Some(res) => {
-                    if let Err(err) = res {
-                        log::error!("{:?}", err);
-                    }
+                    <Self as Reader>::handle_result(res).await
                 },
                 None => break
             }
