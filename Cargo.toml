@@ -7,7 +7,7 @@ edition = "2018"
 
 [features]
 
-default = ["async-std"]
+default = []
 
 builder = []
 
