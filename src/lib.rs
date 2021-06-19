@@ -1,3 +1,7 @@
+#![warn(missing_docs)]
+
+//! # A builder for the broker-reader-writer pattern
+
 use futures::sink::Sink;
 
 pub mod util;
@@ -15,6 +19,7 @@ pub use writer::Writer;
 #[cfg(feature = "builder")]
 pub use builder::Builder;
 
+/// Spawning a broker-reader-writer with `tokio` runtime
 #[cfg(all(feature = "tokio", not(feature = "async-std")))]
 pub fn spawn<B, R, W, BI, WI>(broker: B, reader: R, writer: W
 ) -> (tokio::task::JoinHandle<()>, impl Sink<<B as Broker>::Item>) 
@@ -52,6 +57,7 @@ where
     (broker_handle, broker_tx.into_sink())
 }
 
+/// Spawning a broker-reader-writer with `async-std` runtime
 #[cfg(all(feature = "async-std", not(feature = "tokio")))]
 pub fn spawn<B, R, W, BI, WI>(broker: B, reader: R, writer: W
 ) -> (async_std::task::JoinHandle<()>, impl Sink<<B as Broker>::Item>) 

@@ -1,8 +1,10 @@
+//! Helper functions and trait
 
 use async_trait::async_trait;
 
-// .await until the end of the task in a blocking manner
+/// .await until the end of the task in a blocking manner
 pub trait Conclude {
+    /// .await until the end of the task
     fn conclude(&mut self);
 }
 
@@ -26,6 +28,7 @@ impl Conclude for tokio::task::JoinHandle<()> {
 /// This trait simply cancel/abort the task during execution
 #[async_trait]
 pub trait Terminate {
+    /// Interrupt execution of the task
     async fn terminate(self);
 }
 
