@@ -2,6 +2,10 @@
 
 //! # A builder for the broker-reader-writer pattern
 
+#[cfg(any(
+    all(feature = "tokio", not(feature = "async-std")),
+    all(feature = "async-std", not(feature = "tokio"))
+))]
 use futures::sink::Sink;
 
 pub mod util;
