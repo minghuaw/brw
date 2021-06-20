@@ -7,6 +7,7 @@
     all(feature = "async-std", not(feature = "tokio"))
 ))]
 use futures::sink::Sink;
+use flume::Sender;
 
 pub mod util;
 pub mod broker;
@@ -54,6 +55,13 @@ impl<T> From<Running<T>> for Option<T> {
         }
     }
 }
+/// Context of broker-reader-writer
+pub struct Context<BI> {
+    /// Sender to broker
+    pub broker: Sender<BI>, // 
+    reader_stop: Sender<()>, // this is the reader stopper
+    // writer_stop: Sender<()>, // this is the writer stopper
+}
 
 /// Spawning a broker-reader-writer with `tokio` runtime
 #[cfg(all(feature = "tokio", not(feature = "async-std")))]
@@ -68,10 +76,15 @@ where
 {
     let (broker_tx, broker_rx) = flume::unbounded();
     let (writer_tx, writer_rx) = flume::unbounded();
+    let (reader_stop, stop) = flume::bounded(1);
+    let ctx = Context {
+        broker: broker_tx.clone(),
+        reader_stop
+    };
 
     let broker_sink = broker_tx.clone().into_sink();
     let reader_handle = tokio::task::spawn(
-        reader.reader_loop(broker_sink)
+        reader.reader_loop(broker_sink, stop)
     );
 
     let writer_stream = writer_rx.into_stream();
@@ -79,12 +92,15 @@ where
         writer.writer_loop(writer_stream)  
     );
 
-    let items_stream = broker_rx.into_stream();
-    let writer_sink = writer_tx.into_sink();
+    // let items_stream = broker_rx.into_stream();
+    // let writer_sink = writer_tx.into_sink();
+    let items_stream = broker_rx;
+    let writer_sink = writer_tx;
     let broker_handle = tokio::task::spawn(
         broker.broker_loop(
             items_stream, 
             writer_sink,
+            ctx,
             reader_handle,
             writer_handle
         )
@@ -106,10 +122,15 @@ where
 {
     let (broker_tx, broker_rx) = flume::unbounded();
     let (writer_tx, writer_rx) = flume::unbounded();
+    let (reader_stop, stop) = flume::bounded(1);
+    let ctx = Context {
+        broker: broker_tx.clone(),
+        reader_stop
+    };
 
     let broker_sink = broker_tx.clone().into_sink();
     let reader_handle = async_std::task::spawn(
-        reader.reader_loop(broker_sink)
+        reader.reader_loop(broker_sink, stop)
     );
 
     let writer_stream = writer_rx.into_stream();
@@ -123,6 +144,7 @@ where
         broker.broker_loop(
             items_stream, 
             writer_sink,
+            ctx,
             reader_handle,
             writer_handle
         )
