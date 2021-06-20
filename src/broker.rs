@@ -58,7 +58,6 @@ pub trait Broker: Sized {
         W: Sink<Self::WriterItem, Error = flume::SendError<Self::WriterItem>> + Send + Unpin,
         H: Conclude + Send,
     {
-        log::debug!("Broker loop started");
         // let this = &mut self;
         loop {
             futures::select! {
@@ -89,12 +88,9 @@ pub trait Broker: Sized {
         // Stop the reader
         if !ctx.reader_stop.is_disconnected() {
             log::debug!("reader stop is not disconnected");
-            match ctx.reader_stop.send(()) {
-                Ok(_) => reader_handle.conclude(),
-                Err(_) => { }
+            if ctx.reader_stop.send(()).is_ok() {
+                reader_handle.conclude()
             }
         }
-
-        println!("Dropping broker_loop");
     }
 }

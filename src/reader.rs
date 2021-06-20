@@ -37,7 +37,6 @@ pub trait Reader: Sized {
     where 
         B: Sink<Self::BrokerItem, Error = flume::SendError<Self::BrokerItem>> + Send + Unpin
     {
-        log::debug!("Reader loop started");
         let this = &mut self;
         loop {
             futures::select! {
@@ -58,10 +57,6 @@ pub trait Reader: Sized {
             }
         }
 
-        match ctx.broker_stop.send(()) {
-            Ok(_) => { },
-            Err(_) => { }
-        }
-        println!("Dropping reader_loop");
+        if ctx.broker_stop.send(()).is_ok() { }
     }
 }
