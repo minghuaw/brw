@@ -59,7 +59,7 @@ pub trait Broker: Sized {
         W: Sink<Self::WriterItem, Error = flume::SendError<Self::WriterItem>> + Send + Unpin,
         H: Conclude + Send,
     {
-        // let this = &mut self;
+        let this = &mut self;
         loop {
             futures::select! {
                 _ = stop.recv_async() => {
@@ -67,7 +67,7 @@ pub trait Broker: Sized {
                 },
                 item = items.next().fuse() => {
                     if let Some(item) = item {
-                        match self.op(&ctx, item, &mut writer).await {
+                        match this.op(&ctx, item, &mut writer).await {
                             Running::Continue(res) => {
                                 match <Self as Broker>::handle_result(res).await {
                                     Running::Continue(_) => { },
