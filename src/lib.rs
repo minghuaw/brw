@@ -23,6 +23,32 @@ pub use writer::Writer;
 #[cfg(feature = "builder")]
 pub use builder::Builder;
 
+/// Tells whether the loop should continue
+pub enum Running<T> {
+    /// Continue running
+    Continue(T),
+    /// Stop running
+    Stop,
+}
+
+impl<T> From<Option<T>> for Running<T> {
+    fn from(val: Option<T>) -> Self {
+        match val {
+            Some(inner) => Self::Continue(inner),
+            None => Self::Stop
+        }
+    }
+}
+
+impl<T> From<Running<T>> for Option<T> {
+    fn from(val: Running<T>) -> Self {
+        match val {
+            Running::Continue(inner) => Some(inner),
+            Running::Stop => None
+        }
+    }
+}
+
 /// Spawning a broker-reader-writer with `tokio` runtime
 #[cfg(all(feature = "tokio", not(feature = "async-std")))]
 pub fn spawn<B, R, W, BI, WI>(broker: B, reader: R, writer: W

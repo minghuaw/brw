@@ -6,6 +6,8 @@ use futures::{
     sink::{Sink},
 };
 
+use super::Running;
+
 use crate::util::{Conclude, Terminate};
 
 /// Broker of the broker-reader-writer pattern
@@ -25,12 +27,12 @@ pub trait Broker: Sized {
         &mut self, // use self to maintain state
         item: Self::Item,
         writer: impl Sink<Self::WriterItem>
-    ) -> Option<Result<Self::Ok, Self::Error>>; // None will stop the loop
+    ) -> Running<Result<Self::Ok, Self::Error>>; // None will stop the loop
 
     /// Handles the result of each op
     /// 
     /// Returns a `None` to stop the whole loop
-    async fn handle_result(res: Result<Self::Ok, Self::Error>) -> Option<()>;
+    async fn handle_result(res: Result<Self::Ok, Self::Error>) -> Running<()>;
 
     /// Runs the operation in a loop
     async fn broker_loop<S, W, H>(
@@ -47,13 +49,14 @@ pub trait Broker: Sized {
     {
         while let Some(item) = items.next().await {
             match self.op(item, &mut writer).await {
-                Some(res) => {
-                    if <Self as Broker>::handle_result(res).await.is_none() {
-                        break;
+                Running::Continue(res) => {
+                    match <Self as Broker>::handle_result(res).await {
+                        Running::Continue(_) => { },
+                        Running::Stop => break
                     }
                 },
                 // None is used to indicate stopping the loop
-                None => break
+                Running::Stop => break
             }
         }
 
