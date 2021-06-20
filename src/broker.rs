@@ -28,7 +28,7 @@ pub trait Broker: Sized {
         item: Self::Item,
         writer: W,
     ) -> Running<Result<Self::Ok, Self::Error>>
-    where W: Sink<Self::WriterItem, Error = flume::SendError<Self::WriterItem>> + Unpin; // None will stop the loop
+    where W: Sink<Self::WriterItem, Error = flume::SendError<Self::WriterItem>> + Send + Unpin; // None will stop the loop
 
     /// Handles the result of each op
     /// 

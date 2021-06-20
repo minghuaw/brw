@@ -19,7 +19,7 @@ pub trait Reader: Sized {
 
     /// The operation to perform
     async fn op<B>(&mut self, broker: B) -> Running<Result<Self::Ok, Self::Error>>
-    where B: Sink<Self::BrokerItem, Error = flume::SendError<Self::BrokerItem>> + Unpin;
+    where B: Sink<Self::BrokerItem, Error = flume::SendError<Self::BrokerItem>> + Send + Unpin;
 
     /// Handles the result of each op
     /// 
