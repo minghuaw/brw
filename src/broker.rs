@@ -25,6 +25,7 @@ pub trait Broker: Sized {
     /// The operation to perform
     async fn op<W>(
         &mut self, // use self to maintain state
+        ctx: &mut Context<Self::Item>,
         item: Self::Item,
         writer: W,
     ) -> Running<Result<Self::Ok, Self::Error>>
