@@ -6,11 +6,6 @@
     all(feature = "tokio", not(feature = "async-std")),
     all(feature = "async-std", not(feature = "tokio"))
 ))]
-use futures::sink::Sink;
-#[cfg(any(
-    all(feature = "tokio", not(feature = "async-std")),
-    all(feature = "async-std", not(feature = "tokio"))
-))]
 use std::sync::Arc;
 
 use flume::Sender;
@@ -71,9 +66,12 @@ pub struct Context<BI> {
 }
 
 /// Spawning a broker-reader-writer with `tokio` runtime
-#[cfg(all(feature = "tokio", not(feature = "async-std")))]
+#[cfg(any(
+    feature = "docs",
+    all(feature = "tokio", not(feature = "async-std"))
+))]
 pub fn spawn<B, R, W, BI, WI>(broker: B, reader: R, writer: W
-) -> (tokio::task::JoinHandle<()>, impl Sink<<B as Broker>::Item>) 
+) -> (tokio::task::JoinHandle<()>, Sender<BI>) 
 where 
     B: Broker<Item = BI, WriterItem = WI> + Send + 'static,
     R: Reader<BrokerItem = BI> + Send + 'static,
@@ -115,13 +113,13 @@ where
         )
     );
 
-    (broker_handle, broker_tx.into_sink())
+    (broker_handle, broker_tx)
 }
 
 /// Spawning a broker-reader-writer with `async-std` runtime
 #[cfg(all(feature = "async-std", not(feature = "tokio")))]
 pub fn spawn<B, R, W, BI, WI>(broker: B, reader: R, writer: W
-) -> (async_std::task::JoinHandle<()>, impl Sink<<B as Broker>::Item>) 
+) -> (async_std::task::JoinHandle<()>, Sender<BI>) 
 where 
     B: Broker<Item = BI, WriterItem = WI> + Send + 'static,
     R: Reader<BrokerItem = BI> + Send + 'static,
@@ -163,5 +161,5 @@ where
         )
     );
 
-    (broker_handle, broker_tx.into_sink())
+    (broker_handle, broker_tx)
 }
