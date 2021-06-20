@@ -3,6 +3,7 @@
 use async_trait::async_trait;
 use futures::{
     sink::{Sink},
+    FutureExt
 };
 
 use super::Running;
@@ -27,20 +28,31 @@ pub trait Reader: Sized {
     async fn handle_result(res: Result<Self::Ok, Self::Error>) -> Running<()>;
 
     /// Runs the operation in a loop
-    async fn reader_loop<B>(mut self, mut broker: B)
+    async fn reader_loop<B>(mut self, mut broker: B, stop: flume::Receiver<()>)
     where 
         B: Sink<Self::BrokerItem, Error = flume::SendError<Self::BrokerItem>> + Send + Unpin
     {
+        log::debug!("Reader loop started");
+        let this = &mut self;
         loop {
-            match self.op(&mut broker).await {
-                Running::Continue(res) => {
-                    match <Self as Reader>::handle_result(res).await {
-                        Running::Continue(_) => { },
+            futures::select! {
+                _ = stop.recv_async() => {
+                    break
+                },
+                running = this.op(&mut broker).fuse() => {
+                    match running {
+                        Running::Continue(res) => {
+                            match <Self as Reader>::handle_result(res).await {
+                                Running::Continue(_) => { },
+                                Running::Stop => break
+                            }
+                        },
                         Running::Stop => break
                     }
-                },
-                Running::Stop => break
+                }
             }
         }
+
+        println!("Dropping reader_loop");
     }
 }

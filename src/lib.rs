@@ -92,10 +92,8 @@ where
         writer.writer_loop(writer_stream)  
     );
 
-    // let items_stream = broker_rx.into_stream();
-    // let writer_sink = writer_tx.into_sink();
-    let items_stream = broker_rx;
-    let writer_sink = writer_tx;
+    let items_stream = broker_rx.into_stream();
+    let writer_sink = writer_tx.into_sink();
     let broker_handle = tokio::task::spawn(
         broker.broker_loop(
             items_stream, 
