@@ -1,5 +1,6 @@
 //! Broker trait definition
 
+use flume::SendError;
 use async_trait::async_trait;
 use futures::{
     stream::{Stream, StreamExt},
@@ -23,11 +24,12 @@ pub trait Broker: Sized {
     type Error: std::error::Error + Send;
 
     /// The operation to perform
-    async fn op(
+    async fn op<W>(
         &mut self, // use self to maintain state
         item: Self::Item,
-        writer: impl Sink<Self::WriterItem> + Unpin
-    ) -> Running<Result<Self::Ok, Self::Error>>; // None will stop the loop
+        writer: W,
+    ) -> Running<Result<Self::Ok, Self::Error>>
+    where W: Sink<Self::WriterItem, Error = SendError<Self::WriterItem>> + Unpin; // None will stop the loop
 
     /// Handles the result of each op
     /// 
@@ -44,7 +46,7 @@ pub trait Broker: Sized {
     )
     where 
         S: Stream<Item = Self::Item> + Send + Unpin,
-        W: Sink<Self::WriterItem> + Send + Unpin,
+        W: Sink<Self::WriterItem, Error = flume::SendError<Self::WriterItem>> + Send + Unpin,
         H: Conclude + Terminate + Send,
     {
         while let Some(item) = items.next().await {
