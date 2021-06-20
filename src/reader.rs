@@ -28,6 +28,7 @@ pub trait Reader: Sized {
     /// Returns a `None` to stop the whole loop
     async fn handle_result(res: Result<Self::Ok, Self::Error>) -> Running<()> {
         if let Err(err) = res {
+            #[cfg(feature = "debug")]
             log::error!("{:?}", err);
         }
         Running::Continue(())
@@ -56,8 +57,9 @@ pub trait Reader: Sized {
                 }
             }
         }
-
-        if ctx.broker_stop.send(()).is_ok() { }
+        if !ctx.broker_stop.is_disconnected() {
+            if ctx.broker_stop.send(()).is_ok() { }
+        }
 
         #[cfg(feature = "debug")]
         log::debug!("Exiting reader loop");

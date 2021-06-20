@@ -36,9 +36,10 @@ pub trait Broker: Sized {
     /// Handles the result of each op
     /// 
     /// Returns a `None` to stop the whole loop
-    async fn handle_result(res: Result<Self::Ok, Self::Error>) -> Running<()> {
-        if let Err(err) = res {
-            log::error!("{:?}", err);
+    async fn handle_result(_res: Result<Self::Ok, Self::Error>) -> Running<()> {
+        #[cfg(feature = "debug")]
+        if let Err(err) = _res {
+            log::error!("{:?}", _err);
         }
         Running::Continue(())
     }
@@ -87,12 +88,11 @@ pub trait Broker: Sized {
 
         // Stop the reader
         if !ctx.reader_stop.is_disconnected() {
-            log::debug!("reader stop is not disconnected");
             if ctx.reader_stop.send(()).is_ok() {
                 reader_handle.conclude()
             }
         }
-        
+
         #[cfg(feature = "debug")]
         log::debug!("Exiting broker loop");
     }
