@@ -7,8 +7,13 @@
     all(feature = "async-std", not(feature = "tokio"))
 ))]
 use futures::sink::Sink;
-use flume::Sender;
+#[cfg(any(
+    all(feature = "tokio", not(feature = "async-std")),
+    all(feature = "async-std", not(feature = "tokio"))
+))]
 use std::sync::Arc;
+
+use flume::Sender;
 
 pub mod util;
 pub mod broker;

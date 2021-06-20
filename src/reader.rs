@@ -58,7 +58,10 @@ pub trait Reader: Sized {
             }
         }
 
-        ctx.broker_stop.send(());
+        match ctx.broker_stop.send(()) {
+            Ok(_) => { },
+            Err(_) => { }
+        }
         println!("Dropping reader_loop");
     }
 }
