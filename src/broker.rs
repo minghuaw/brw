@@ -6,7 +6,7 @@ use futures::{
     sink::{Sink},
 };
 
-use super::Running;
+use super::{Running, Context};
 
 use crate::util::{Conclude, Terminate};
 
@@ -40,6 +40,7 @@ pub trait Broker: Sized {
         mut self, 
         mut items: S, 
         mut writer: W, 
+        mut ctx: Context<Self::Item>,
         mut reader_handle: H, 
         mut writer_handle: H
     )
@@ -48,20 +49,33 @@ pub trait Broker: Sized {
         W: Sink<Self::WriterItem, Error = flume::SendError<Self::WriterItem>> + Send + Unpin,
         H: Conclude + Terminate + Send,
     {
-        while let Some(item) = items.next().await {
-            match self.op(item, &mut writer).await {
-                Running::Continue(res) => {
-                    match <Self as Broker>::handle_result(res).await {
-                        Running::Continue(_) => { },
-                        Running::Stop => break
-                    }
-                },
-                // None is used to indicate stopping the loop
-                Running::Stop => break
+        log::debug!("Broker loop started");
+
+        loop {
+            if let Some(item) = items.next().await {
+                match self.op(&mut ctx, item, &mut writer).await {
+                    Running::Continue(res) => {
+                        match <Self as Broker>::handle_result(res).await {
+                            Running::Continue(_) => { },
+                            Running::Stop => break
+                        }
+                    },
+                    // None is used to indicate stopping the loop
+                    Running::Stop => break
+                }
             }
         }
 
-        reader_handle.conclude();
+        // Stop the writer
+        drop(writer); 
         writer_handle.conclude();
+
+        // Stop the reader
+        match ctx.reader_stop.send(()) {
+            Ok(_) => reader_handle.conclude(),
+            Err(_) => reader_handle.terminate().await
+        }
+
+        println!("Dropping broker_loop");
     }
 }
