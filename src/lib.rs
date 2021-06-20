@@ -40,6 +40,12 @@ impl<T> From<Option<T>> for Running<T> {
     }
 }
 
+impl<T, E> From<Result<T, E>> for Running<Result<T, E>> {
+    fn from(res: Result<T, E>) -> Self {
+        Running::Continue(res)
+    }
+}
+
 impl<T> From<Running<T>> for Option<T> {
     fn from(val: Running<T>) -> Self {
         match val {
