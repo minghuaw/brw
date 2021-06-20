@@ -47,3 +47,10 @@ impl Terminate for tokio::task::JoinHandle<()> {
         self.abort();
     }
 }
+
+#[async_trait]
+impl Terminate for Box<dyn Terminate + Send> {
+    async fn terminate(self) {
+        self.terminate().await;
+    }
+}

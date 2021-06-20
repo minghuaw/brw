@@ -34,7 +34,12 @@ pub trait Broker: Sized {
     /// Handles the result of each op
     /// 
     /// Returns a `None` to stop the whole loop
-    async fn handle_result(res: Result<Self::Ok, Self::Error>) -> Running<()>;
+    async fn handle_result(res: Result<Self::Ok, Self::Error>) -> Running<()> {
+        if let Err(err) = res {
+            log::error!("{:?}", err);
+        }
+        Running::Continue(())
+    }
 
     /// Runs the operation in a loop
     async fn broker_loop<S, W, H>(
