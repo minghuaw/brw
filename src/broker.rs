@@ -26,7 +26,7 @@ pub trait Broker: Sized {
     async fn op(
         &mut self, // use self to maintain state
         item: Self::Item,
-        writer: impl Sink<Self::WriterItem>
+        writer: impl Sink<Self::WriterItem> + Unpin
     ) -> Running<Result<Self::Ok, Self::Error>>; // None will stop the loop
 
     /// Handles the result of each op

@@ -18,7 +18,7 @@ pub trait Reader: Sized {
     type Error: std::error::Error + Send;
 
     /// The operation to perform
-    async fn op(&mut self, broker: impl Sink<Self::BrokerItem>) -> Running<Result<Self::Ok, Self::Error>>;
+    async fn op(&mut self, broker: impl Sink<Self::BrokerItem> + Unpin) -> Running<Result<Self::Ok, Self::Error>>;
 
     /// Handles the result of each op
     /// 

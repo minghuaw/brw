@@ -47,6 +47,7 @@ pub trait Writer: Sized {
 #[cfg(test)]
 mod tests {
     use async_trait::async_trait;
+    use futures::sink::SinkExt;
 
     use crate::{Writer, Running};
     // Simply print out receive items
@@ -82,13 +83,13 @@ mod tests {
     async fn test_writer() {
         let w = TestWriter{ };
         let (tx, rx) = flume::unbounded();
-
+        let mut tx = tx.into_sink();
         let handle = tokio::task::spawn(w.writer_loop(rx.into_stream()));
         
         for i in 0..10 {
-            tx.send(TestWriterItem::Foo(i.to_string()))
+            tx.send(TestWriterItem::Foo(i.to_string())).await
                 .unwrap();
-            tx.send(TestWriterItem::Bar(i))
+            tx.send(TestWriterItem::Bar(i)).await
                 .unwrap();
         }
         drop(tx);
