@@ -1,6 +1,5 @@
 //! Reader trait definition
 
-use flume::SendError;
 use async_trait::async_trait;
 use futures::{
     sink::{Sink},
@@ -20,7 +19,7 @@ pub trait Reader: Sized {
 
     /// The operation to perform
     async fn op<B>(&mut self, broker: B) -> Running<Result<Self::Ok, Self::Error>>
-    where B: Sink<Self::BrokerItem, Error = SendError<Self::BrokerItem>> + Unpin;
+    where B: Sink<Self::BrokerItem, Error = flume::SendError<Self::BrokerItem>> + Unpin;
 
     /// Handles the result of each op
     /// 
@@ -30,7 +29,7 @@ pub trait Reader: Sized {
     /// Runs the operation in a loop
     async fn reader_loop<B>(mut self, mut broker: B)
     where 
-        B: Sink<Self::BrokerItem, Error = SendError<Self::BrokerItem>> + Send + Unpin
+        B: Sink<Self::BrokerItem, Error = flume::SendError<Self::BrokerItem>> + Send + Unpin
     {
         loop {
             match self.op(&mut broker).await {
