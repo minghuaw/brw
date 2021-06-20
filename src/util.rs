@@ -16,9 +16,11 @@ impl Conclude for async_std::task::JoinHandle<()> {
 #[cfg(feature = "tokio")]
 impl Conclude for tokio::task::JoinHandle<()> {
     fn conclude(&mut self) {
-        tokio::task::block_in_place(
+        if let Err(_err) = tokio::task::block_in_place(
             || tokio::runtime::Handle::current().block_on(self)
-        )
-        .unwrap_or_else(|err| log::error!("{:?}", err)) 
+        ) {
+            #[cfg(feature = "log")]
+            log::error!("{:?}", _err)
+        }
     }
 }

@@ -24,9 +24,9 @@ pub trait Writer: Sized {
     /// 
     /// Returns a `None` to stop the whole loop
     async fn handle_result(res: Result<Self::Ok, Self::Error>) -> Running<()> {
-        if let Err(err) = res {
+        if let Err(_err) = res {
             #[cfg(feature = "debug")]
-            log::error!("{:?}", err);
+            log::error!("{:?}", _err);
         }
         Running::Continue(())
     }
