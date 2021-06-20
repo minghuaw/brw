@@ -92,5 +92,8 @@ pub trait Broker: Sized {
                 reader_handle.conclude()
             }
         }
+        
+        #[cfg(feature = "debug")]
+        log::debug!("Exiting broker loop");
     }
 }

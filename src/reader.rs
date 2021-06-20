@@ -58,5 +58,8 @@ pub trait Reader: Sized {
         }
 
         if ctx.broker_stop.send(()).is_ok() { }
+
+        #[cfg(feature = "debug")]
+        log::debug!("Exiting reader loop");
     }
 }

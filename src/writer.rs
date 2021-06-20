@@ -45,6 +45,9 @@ pub trait Writer: Sized {
                 Running::Stop => break
             }
         }
+
+        #[cfg(feature = "debug")]
+        log::debug!("Exiting writer loop");
     }
 }
 

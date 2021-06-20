@@ -14,6 +14,7 @@ readme = "Readme.md"
 default = []
 
 builder = []
+debug = []
 
 [dev-dependencies]
 tokio = { version = "1.7.1", features = ["rt-multi-thread", "macros"] }
