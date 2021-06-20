@@ -1,12 +1,13 @@
 //! Reader trait definition
 
+use std::sync::Arc;
 use async_trait::async_trait;
 use futures::{
     sink::{Sink},
     FutureExt
 };
 
-use super::Running;
+use super::{Running, Context};
 
 /// Reader of the broker-reader-writer pattern
 #[async_trait]
@@ -32,7 +33,7 @@ pub trait Reader: Sized {
         Running::Continue(())
     }
     /// Runs the operation in a loop
-    async fn reader_loop<B>(mut self, mut broker: B, stop: flume::Receiver<()>)
+    async fn reader_loop<B>(mut self, ctx: Arc<Context<Self::BrokerItem>>, mut broker: B, stop: flume::Receiver<()>)
     where 
         B: Sink<Self::BrokerItem, Error = flume::SendError<Self::BrokerItem>> + Send + Unpin
     {
@@ -57,6 +58,7 @@ pub trait Reader: Sized {
             }
         }
 
+        ctx.broker_stop.send(());
         println!("Dropping reader_loop");
     }
 }

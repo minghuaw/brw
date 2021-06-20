@@ -1,14 +1,16 @@
 //! Broker trait definition
-
+use std::sync::Arc;
 use async_trait::async_trait;
+use flume::Receiver;
 use futures::{
     stream::{Stream, StreamExt},
     sink::{Sink},
+    FutureExt
 };
 
 use super::{Running, Context};
 
-use crate::util::{Conclude, Terminate};
+use crate::util::{Conclude};
 
 /// Broker of the broker-reader-writer pattern
 #[async_trait]
@@ -25,7 +27,7 @@ pub trait Broker: Sized {
     /// The operation to perform
     async fn op<W>(
         &mut self, // use self to maintain state
-        ctx: &mut Context<Self::Item>,
+        ctx: &Arc<Context<Self::Item>>,
         item: Self::Item,
         writer: W,
     ) -> Running<Result<Self::Ok, Self::Error>>
@@ -46,27 +48,37 @@ pub trait Broker: Sized {
         mut self, 
         mut items: S, 
         mut writer: W, 
-        mut ctx: Context<Self::Item>,
+        ctx: Arc<Context<Self::Item>>,
+        stop: Receiver<()>,
         mut reader_handle: H, 
         mut writer_handle: H
     )
     where 
         S: Stream<Item = Self::Item> + Send + Unpin,
         W: Sink<Self::WriterItem, Error = flume::SendError<Self::WriterItem>> + Send + Unpin,
-        H: Conclude + Terminate + Send,
+        H: Conclude + Send,
     {
         log::debug!("Broker loop started");
-
-        while let Some(item) = items.next().await {
-            match self.op(&mut ctx, item, &mut writer).await {
-                Running::Continue(res) => {
-                    match <Self as Broker>::handle_result(res).await {
-                        Running::Continue(_) => { },
-                        Running::Stop => break
-                    }
+        // let this = &mut self;
+        loop {
+            futures::select! {
+                _ = stop.recv_async() => {
+                    break;
                 },
-                // None is used to indicate stopping the loop
-                Running::Stop => break
+                item = items.next().fuse() => {
+                    if let Some(item) = item {
+                        match self.op(&ctx, item, &mut writer).await {
+                            Running::Continue(res) => {
+                                match <Self as Broker>::handle_result(res).await {
+                                    Running::Continue(_) => { },
+                                    Running::Stop => break
+                                }
+                            },
+                            // None is used to indicate stopping the loop
+                            Running::Stop => break
+                        }
+                    }
+                }
             }
         }
 
@@ -75,9 +87,12 @@ pub trait Broker: Sized {
         writer_handle.conclude();
 
         // Stop the reader
-        match ctx.reader_stop.send(()) {
-            Ok(_) => reader_handle.conclude(),
-            Err(_) => reader_handle.terminate().await
+        if !ctx.reader_stop.is_disconnected() {
+            log::debug!("reader stop is not disconnected");
+            match ctx.reader_stop.send(()) {
+                Ok(_) => reader_handle.conclude(),
+                Err(_) => { }
+            }
         }
 
         println!("Dropping broker_loop");

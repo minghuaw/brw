@@ -25,32 +25,32 @@ impl Conclude for tokio::task::JoinHandle<()> {
     }
 }
 
-/// This trait simply cancel/abort the task during execution
-#[async_trait]
-pub trait Terminate {
-    /// Interrupt execution of the task
-    async fn terminate(self);
-}
+// /// This trait simply cancel/abort the task during execution
+// #[async_trait]
+// pub trait Terminate {
+//     /// Interrupt execution of the task
+//     async fn terminate(self);
+// }
 
-#[cfg(feature = "async-std")]
-#[async_trait]
-impl Terminate for async_std::task::JoinHandle<()> {
-    async fn terminate(self) {
-        self.cancel().await;
-    }
-}
+// #[cfg(feature = "async-std")]
+// #[async_trait]
+// impl Terminate for async_std::task::JoinHandle<()> {
+//     async fn terminate(self) {
+//         self.cancel().await;
+//     }
+// }
 
-#[cfg(feature = "tokio")]
-#[async_trait]
-impl Terminate for tokio::task::JoinHandle<()> {
-    async fn terminate(self) {
-        self.abort();
-    }
-}
+// #[cfg(feature = "tokio")]
+// #[async_trait]
+// impl Terminate for tokio::task::JoinHandle<()> {
+//     async fn terminate(self) {
+//         self.abort();
+//     }
+// }
 
-#[async_trait]
-impl Terminate for Box<dyn Terminate + Send> {
-    async fn terminate(self) {
-        self.terminate().await;
-    }
-}
+// #[async_trait]
+// impl Terminate for Box<dyn Terminate + Send> {
+//     async fn terminate(self) {
+//         self.terminate().await;
+//     }
+// }

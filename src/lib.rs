@@ -8,6 +8,7 @@
 ))]
 use futures::sink::Sink;
 use flume::Sender;
+use std::sync::Arc;
 
 pub mod util;
 pub mod broker;
@@ -59,6 +60,7 @@ impl<T> From<Running<T>> for Option<T> {
 pub struct Context<BI> {
     /// Sender to broker
     pub broker: Sender<BI>, // 
+    broker_stop: Sender<()>,
     reader_stop: Sender<()>, // this is the reader stopper
     // writer_stop: Sender<()>, // this is the writer stopper
 }
@@ -76,15 +78,18 @@ where
 {
     let (broker_tx, broker_rx) = flume::unbounded();
     let (writer_tx, writer_rx) = flume::unbounded();
-    let (reader_stop, stop) = flume::bounded(1);
+    let (reader_stop, stop_reader) = flume::bounded(1);
+    let (broker_stop, stop_broker) = flume::bounded(1);
     let ctx = Context {
         broker: broker_tx.clone(),
-        reader_stop
+        broker_stop,
+        reader_stop,
     };
+    let ctx = Arc::new(ctx);
 
     let broker_sink = broker_tx.clone().into_sink();
     let reader_handle = tokio::task::spawn(
-        reader.reader_loop(broker_sink, stop)
+        reader.reader_loop(Arc::clone(&ctx), broker_sink, stop_reader)
     );
 
     let writer_stream = writer_rx.into_stream();
@@ -99,6 +104,7 @@ where
             items_stream, 
             writer_sink,
             ctx,
+            stop_broker,
             reader_handle,
             writer_handle
         )
@@ -120,15 +126,18 @@ where
 {
     let (broker_tx, broker_rx) = flume::unbounded();
     let (writer_tx, writer_rx) = flume::unbounded();
-    let (reader_stop, stop) = flume::bounded(1);
+    let (reader_stop, stop_reader) = flume::bounded(1);
+    let (broker_stop, stop_broker) = flume::bounded(1);
     let ctx = Context {
         broker: broker_tx.clone(),
-        reader_stop
+        broker_stop,
+        reader_stop,
     };
+    let ctx = Arc::new(ctx);
 
     let broker_sink = broker_tx.clone().into_sink();
     let reader_handle = async_std::task::spawn(
-        reader.reader_loop(broker_sink, stop)
+        reader.reader_loop(Arc::clone(&ctx), broker_sink, stop_reader)
     );
 
     let writer_stream = writer_rx.into_stream();
@@ -143,6 +152,7 @@ where
             items_stream, 
             writer_sink,
             ctx,
+            stop_broker,
             reader_handle,
             writer_handle
         )
