@@ -57,18 +57,16 @@ pub trait Broker: Sized {
     {
         log::debug!("Broker loop started");
 
-        loop {
-            if let Some(item) = items.next().await {
-                match self.op(&mut ctx, item, &mut writer).await {
-                    Running::Continue(res) => {
-                        match <Self as Broker>::handle_result(res).await {
-                            Running::Continue(_) => { },
-                            Running::Stop => break
-                        }
-                    },
-                    // None is used to indicate stopping the loop
-                    Running::Stop => break
-                }
+        while let Some(item) = items.next().await {
+            match self.op(&mut ctx, item, &mut writer).await {
+                Running::Continue(res) => {
+                    match <Self as Broker>::handle_result(res).await {
+                        Running::Continue(_) => { },
+                        Running::Stop => break
+                    }
+                },
+                // None is used to indicate stopping the loop
+                Running::Stop => break
             }
         }
 
