@@ -2,15 +2,11 @@
 use std::sync::Arc;
 use async_trait::async_trait;
 use flume::Receiver;
-use futures::{
-    stream::{Stream, StreamExt},
-    sink::{Sink},
-    FutureExt
-};
+use futures::{Future, FutureExt, sink::{Sink}, stream::{Stream, StreamExt}};
 
 use super::{Running, Context};
 
-use crate::util::{Conclude};
+// use crate::util::{Conclude};
 
 /// Broker of the broker-reader-writer pattern
 #[async_trait]
@@ -51,13 +47,13 @@ pub trait Broker: Sized {
         mut writer: W, 
         ctx: Arc<Context<Self::Item>>,
         stop: Receiver<()>,
-        mut reader_handle: H, 
-        mut writer_handle: H
+        reader_handle: H, 
+        writer_handle: H
     )
     where 
         S: Stream<Item = Self::Item> + Send + Unpin,
         W: Sink<Self::WriterItem, Error = flume::SendError<Self::WriterItem>> + Send + Unpin,
-        H: Conclude + Send,
+        H: Future + Send,
     {
         let this = &mut self;
         loop {
@@ -83,13 +79,17 @@ pub trait Broker: Sized {
         }
 
         // Stop the writer
+        #[cfg(feature = "debug")]
+        log::debug!("Dropping writer");
         drop(writer); 
-        writer_handle.conclude();
+        #[cfg(feature = "debug")]
+        log::debug!(".await writer handle");
+        let _ = writer_handle.await;
 
         // Stop the reader
         if !ctx.reader_stop.is_disconnected() {
-            if ctx.reader_stop.send(()).is_ok() {
-                reader_handle.conclude()
+            if ctx.reader_stop.send_async(()).await.is_ok() {
+                let _ = reader_handle.await;
             }
         }
 

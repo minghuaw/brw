@@ -10,7 +10,6 @@ use std::sync::Arc;
 
 use flume::Sender;
 
-pub mod util;
 pub mod broker;
 pub mod reader;
 pub mod writer;
