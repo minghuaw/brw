@@ -56,6 +56,7 @@ pub trait Broker: Sized {
         H: Future + Send,
     {
         let this = &mut self;
+        let f = Self::handle_result;
         loop {
             futures::select! {
                 _ = stop.recv_async() => {
@@ -65,7 +66,7 @@ pub trait Broker: Sized {
                     if let Some(item) = item {
                         match this.op(&ctx, item, &mut writer).await {
                             Running::Continue(res) => {
-                                match <Self as Broker>::handle_result(res).await {
+                                match f(res).await {
                                     Running::Continue(_) => { },
                                     Running::Stop => break
                                 }

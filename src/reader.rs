@@ -39,6 +39,7 @@ pub trait Reader: Sized {
         B: Sink<Self::BrokerItem, Error = flume::SendError<Self::BrokerItem>> + Send + Unpin
     {
         let this = &mut self;
+        let f = Self::handle_result;
         loop {
             futures::select! {
                 _ = stop.recv_async() => {
@@ -47,7 +48,7 @@ pub trait Reader: Sized {
                 running = this.op(&mut broker).fuse() => {
                     match running {
                         Running::Continue(res) => {
-                            match <Self as Reader>::handle_result(res).await {
+                            match f(res).await {
                                 Running::Continue(_) => { },
                                 Running::Stop => break
                             }
