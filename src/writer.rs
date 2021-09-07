@@ -1,7 +1,7 @@
 //! Writer trait definition
 
 use async_trait::async_trait;
-use futures::{
+use futures_util::{
     stream::{Stream, StreamExt},
 };
 
@@ -55,7 +55,9 @@ pub trait Writer: Sized {
 #[cfg(test)]
 mod tests {
     use async_trait::async_trait;
-    use futures::sink::SinkExt;
+    use futures_util::sink::SinkExt;
+    use tokio_stream::wrappers::ReceiverStream;
+    use tokio_util::sync::PollSender;
 
     use crate::{Writer, Running};
     // Simply print out receive items
@@ -89,10 +91,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_writer() {
+        let bound = 100;
         let w = TestWriter{ };
-        let (tx, rx) = flume::unbounded();
-        let mut tx = tx.into_sink();
-        let handle = tokio::task::spawn(w.writer_loop(rx.into_stream()));
+        let (tx, rx) = tokio::sync::mpsc::channel(bound);
+        let mut tx = PollSender::new(tx);
+        let handle = tokio::task::spawn(w.writer_loop(ReceiverStream::new(rx)));
         
         for i in 0..10 {
             tx.send(TestWriterItem::Foo(i.to_string())).await

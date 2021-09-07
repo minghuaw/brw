@@ -2,10 +2,12 @@
 
 use std::sync::Arc;
 use async_trait::async_trait;
-use futures::{
+use futures_util::{
     sink::{Sink},
-    FutureExt
+    FutureExt,
+    select
 };
+use tokio::sync::mpsc::{ Receiver, error::SendError };
 
 use super::{Running, Context};
 
@@ -21,7 +23,7 @@ pub trait Reader: Sized {
 
     /// The operation to perform
     async fn op<B>(&mut self, broker: B) -> Running<Result<Self::Ok, Self::Error>>
-    where B: Sink<Self::BrokerItem, Error = flume::SendError<Self::BrokerItem>> + Send + Unpin;
+    where B: Sink<Self::BrokerItem, Error = SendError<Self::BrokerItem>> + Send + Unpin;
 
     /// Handles the result of each op
     /// 
@@ -34,15 +36,15 @@ pub trait Reader: Sized {
         Running::Continue(())
     }
     /// Runs the operation in a loop
-    async fn reader_loop<B>(mut self, ctx: Arc<Context<Self::BrokerItem>>, mut broker: B, stop: flume::Receiver<()>)
+    async fn reader_loop<B>(mut self, ctx: Arc<Context<Self::BrokerItem>>, mut broker: B, mut stop: Receiver<()>)
     where 
-        B: Sink<Self::BrokerItem, Error = flume::SendError<Self::BrokerItem>> + Send + Unpin
+        B: Sink<Self::BrokerItem, Error = SendError<Self::BrokerItem>> + Send + Unpin
     {
         let this = &mut self;
         let f = Self::handle_result;
         loop {
-            futures::select! {
-                _ = stop.recv_async() => {
+            select! {
+                _ = stop.recv().fuse() => {
                     break
                 },
                 running = this.op(&mut broker).fuse() => {
@@ -58,8 +60,8 @@ pub trait Reader: Sized {
                 }
             }
         }
-        if !ctx.broker_stop.is_disconnected() {
-            if ctx.broker_stop.send(()).is_ok() { }
+        if !ctx.broker_stop.is_closed() {
+            let _ = ctx.broker_stop.try_send(());
         }
 
         #[cfg(feature = "debug")]

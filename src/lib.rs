@@ -8,7 +8,10 @@
 ))]
 use std::sync::Arc;
 
-use flume::Sender;
+#[cfg(all(feature = "tokio", not(feature = "async-std")))]
+use tokio::sync::mpsc::{self, Sender};
+use tokio_util::sync::PollSender;
+use tokio_stream::wrappers::ReceiverStream;
 
 pub mod broker;
 pub mod reader;
@@ -69,7 +72,7 @@ pub struct Context<BI> {
     feature = "docs",
     all(feature = "tokio", not(feature = "async-std"))
 ))]
-pub fn spawn<B, R, W, BI, WI>(broker: B, reader: R, writer: W
+pub fn spawn<B, R, W, BI, WI>(broker: B, reader: R, writer: W, bound: usize
 ) -> (tokio::task::JoinHandle<()>, Sender<BI>) 
 where 
     B: Broker<Item = BI, WriterItem = WI> + Send + 'static,
@@ -78,10 +81,10 @@ where
     BI: Send + 'static,
     WI: Send + 'static,
 {
-    let (broker_tx, broker_rx) = flume::unbounded();
-    let (writer_tx, writer_rx) = flume::unbounded();
-    let (reader_stop, stop_reader) = flume::bounded(1);
-    let (broker_stop, stop_broker) = flume::bounded(1);
+    let (broker_tx, broker_rx) = mpsc::channel(bound);
+    let (writer_tx, writer_rx) = mpsc::channel(bound);
+    let (reader_stop, stop_reader) = mpsc::channel(bound);
+    let (broker_stop, stop_broker) = mpsc::channel(bound);
     let ctx = Context {
         broker: broker_tx.clone(),
         broker_stop,
@@ -89,18 +92,18 @@ where
     };
     let ctx = Arc::new(ctx);
 
-    let broker_sink = broker_tx.clone().into_sink();
+    let broker_sink = PollSender::new(broker_tx.clone());
     let reader_handle = tokio::task::spawn(
         reader.reader_loop(Arc::clone(&ctx), broker_sink, stop_reader)
     );
 
-    let writer_stream = writer_rx.into_stream();
+    let writer_stream = ReceiverStream:: new(writer_rx);
     let writer_handle = tokio::task::spawn(
         writer.writer_loop(writer_stream)  
     );
 
-    let items_stream = broker_rx.into_stream();
-    let writer_sink = writer_tx.into_sink();
+    let items_stream = ReceiverStream::new(broker_rx);
+    let writer_sink = PollSender::new(writer_tx);
     let broker_handle = tokio::task::spawn(
         broker.broker_loop(
             items_stream, 

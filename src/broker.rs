@@ -1,8 +1,8 @@
 //! Broker trait definition
 use std::sync::Arc;
 use async_trait::async_trait;
-use flume::Receiver;
-use futures::{Future, FutureExt, sink::{Sink}, stream::{Stream, StreamExt}};
+use futures_util::{Future, FutureExt, sink::{Sink}, stream::{Stream, StreamExt}, select};
+use tokio::sync::mpsc::{Receiver, error::SendError};
 
 use super::{Running, Context};
 
@@ -27,7 +27,7 @@ pub trait Broker: Sized {
         item: Self::Item,
         writer: W,
     ) -> Running<Result<Self::Ok, Self::Error>>
-    where W: Sink<Self::WriterItem, Error = flume::SendError<Self::WriterItem>> + Send + Unpin; // None will stop the loop
+    where W: Sink<Self::WriterItem, Error = SendError<Self::WriterItem>> + Send + Unpin; // None will stop the loop
 
     /// Handles the result of each op
     /// 
@@ -46,20 +46,20 @@ pub trait Broker: Sized {
         mut items: S, 
         mut writer: W, 
         ctx: Arc<Context<Self::Item>>,
-        stop: Receiver<()>,
+        mut stop: Receiver<()>,
         reader_handle: H, 
         writer_handle: H
     )
     where 
         S: Stream<Item = Self::Item> + Send + Unpin,
-        W: Sink<Self::WriterItem, Error = flume::SendError<Self::WriterItem>> + Send + Unpin,
+        W: Sink<Self::WriterItem, Error = SendError<Self::WriterItem>> + Send + Unpin,
         H: Future + Send,
     {
         let this = &mut self;
         let f = Self::handle_result;
         loop {
-            futures::select! {
-                _ = stop.recv_async() => {
+            select! {
+                _ = stop.recv().fuse() => {
                     break;
                 },
                 item = items.next().fuse() => {
@@ -88,8 +88,8 @@ pub trait Broker: Sized {
         let _ = writer_handle.await;
 
         // Stop the reader
-        if !ctx.reader_stop.is_disconnected() {
-            if ctx.reader_stop.send_async(()).await.is_ok() {
+        if !ctx.reader_stop.is_closed() {
+            if ctx.reader_stop.send(()).await.is_ok() {
                 let _ = reader_handle.await;
             }
         }
