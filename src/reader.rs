@@ -7,7 +7,7 @@ use futures_util::{
     FutureExt,
     select
 };
-use tokio::sync::mpsc::{ Receiver, error::SendError };
+use tokio::sync::{Mutex, mpsc::{ error::SendError }, oneshot};
 
 use super::{Running, Context};
 
@@ -36,15 +36,16 @@ pub trait Reader: Sized {
         Running::Continue(())
     }
     /// Runs the operation in a loop
-    async fn reader_loop<B>(mut self, ctx: Arc<Context<Self::BrokerItem>>, mut broker: B, mut stop: Receiver<()>)
+    async fn reader_loop<B>(mut self, ctx: Arc<Mutex<Context<Self::BrokerItem>>>, mut broker: B, mut stop: oneshot::Receiver<()>)
     where 
         B: Sink<Self::BrokerItem, Error = SendError<Self::BrokerItem>> + Send + Unpin
     {
         let this = &mut self;
         let f = Self::handle_result;
+        let stop_mut = &mut stop;
         loop {
             select! {
-                _ = stop.recv().fuse() => {
+                _ = stop_mut.fuse() => {
                     break
                 },
                 running = this.op(&mut broker).fuse() => {
@@ -60,8 +61,11 @@ pub trait Reader: Sized {
                 }
             }
         }
-        if !ctx.broker_stop.is_closed() {
-            let _ = ctx.broker_stop.try_send(());
+        {
+            let mut guard = ctx.lock().await;
+            if let Some(broker_stop) = guard.broker_stop.take() {
+                let _ = broker_stop.send(());
+            }
         }
 
         #[cfg(feature = "debug")]

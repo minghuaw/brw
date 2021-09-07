@@ -2,7 +2,7 @@
 use std::sync::Arc;
 use async_trait::async_trait;
 use futures_util::{Future, FutureExt, sink::{Sink}, stream::{Stream, StreamExt}, select};
-use tokio::sync::mpsc::{Receiver, error::SendError};
+use tokio::sync::{Mutex, mpsc::{error::SendError}, oneshot};
 
 use super::{Running, Context};
 
@@ -23,7 +23,7 @@ pub trait Broker: Sized {
     /// The operation to perform
     async fn op<W>(
         &mut self, // use self to maintain state
-        ctx: &Arc<Context<Self::Item>>,
+        ctx: &Arc<Mutex<Context<Self::Item>>>,
         item: Self::Item,
         writer: W,
     ) -> Running<Result<Self::Ok, Self::Error>>
@@ -45,8 +45,8 @@ pub trait Broker: Sized {
         mut self, 
         mut items: S, 
         mut writer: W, 
-        ctx: Arc<Context<Self::Item>>,
-        mut stop: Receiver<()>,
+        ctx: Arc<Mutex<Context<Self::Item>>>,
+        mut stop: oneshot::Receiver<()>,
         reader_handle: H, 
         writer_handle: H
     )
@@ -57,9 +57,10 @@ pub trait Broker: Sized {
     {
         let this = &mut self;
         let f = Self::handle_result;
+        let stop_mut = &mut stop;
         loop {
             select! {
-                _ = stop.recv().fuse() => {
+                _ = stop_mut.fuse() => {
                     break;
                 },
                 item = items.next().fuse() => {
@@ -87,11 +88,13 @@ pub trait Broker: Sized {
         log::debug!(".await writer handle");
         let _ = writer_handle.await;
 
-        // Stop the reader
-        if !ctx.reader_stop.is_closed() {
-            if ctx.reader_stop.send(()).await.is_ok() {
-                let _ = reader_handle.await;
+        {
+            let mut guard = ctx.lock().await;
+            // Stop the reader
+            if let Some(reader_stop) = guard.reader_stop.take() {
+                let _ = reader_stop.send(());
             }
+            
         }
 
         #[cfg(feature = "debug")]

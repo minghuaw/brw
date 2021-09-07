@@ -9,9 +9,14 @@
 use std::sync::Arc;
 
 #[cfg(all(feature = "tokio", not(feature = "async-std")))]
-use tokio::sync::mpsc::{self, Sender};
+use tokio::sync::{oneshot, mpsc::{self, Sender}};
+#[cfg(all(feature = "tokio", not(feature = "async-std")))]
 use tokio_util::sync::PollSender;
+#[cfg(all(feature = "tokio", not(feature = "async-std")))]
 use tokio_stream::wrappers::ReceiverStream;
+
+#[cfg(all(feature = "async-std", not(feature = "tokio")))]
+use async_std::channel::{bounded, Sender};
 
 pub mod broker;
 pub mod reader;
@@ -62,8 +67,8 @@ impl<T> From<Running<T>> for Option<T> {
 pub struct Context<BI> {
     /// Sender to broker
     pub broker: Sender<BI>, // 
-    broker_stop: Sender<()>,
-    reader_stop: Sender<()>, // this is the reader stopper
+    broker_stop: Option<oneshot::Sender<()>>,
+    reader_stop: Option<oneshot::Sender<()>>, // this is the reader stopper
     // writer_stop: Sender<()>, // this is the writer stopper
 }
 
@@ -81,16 +86,18 @@ where
     BI: Send + 'static,
     WI: Send + 'static,
 {
+    use tokio::sync::Mutex;
+
     let (broker_tx, broker_rx) = mpsc::channel(bound);
     let (writer_tx, writer_rx) = mpsc::channel(bound);
-    let (reader_stop, stop_reader) = mpsc::channel(bound);
-    let (broker_stop, stop_broker) = mpsc::channel(bound);
+    let (reader_stop, stop_reader) = oneshot::channel();
+    let (broker_stop, stop_broker) = oneshot::channel();
     let ctx = Context {
         broker: broker_tx.clone(),
-        broker_stop,
-        reader_stop,
+        broker_stop: Some(broker_stop),
+        reader_stop: Some(reader_stop),
     };
-    let ctx = Arc::new(ctx);
+    let ctx = Arc::new(Mutex::new(ctx));
 
     let broker_sink = PollSender::new(broker_tx.clone());
     let reader_handle = tokio::task::spawn(
@@ -120,7 +127,7 @@ where
 
 /// Spawning a broker-reader-writer with `async-std` runtime
 #[cfg(all(feature = "async-std", not(feature = "tokio")))]
-pub fn spawn<B, R, W, BI, WI>(broker: B, reader: R, writer: W
+pub fn spawn<B, R, W, BI, WI>(broker: B, reader: R, writer: W, bound: usize
 ) -> (async_std::task::JoinHandle<()>, Sender<BI>) 
 where 
     B: Broker<Item = BI, WriterItem = WI> + Send + 'static,
@@ -129,10 +136,10 @@ where
     BI: Send + 'static,
     WI: Send + 'static,
 {
-    let (broker_tx, broker_rx) = flume::unbounded();
-    let (writer_tx, writer_rx) = flume::unbounded();
-    let (reader_stop, stop_reader) = flume::bounded(1);
-    let (broker_stop, stop_broker) = flume::bounded(1);
+    let (broker_tx, broker_rx) = bounded(bound);
+    let (writer_tx, writer_rx) = bounded(bound);
+    let (reader_stop, stop_reader) = bounded(1);
+    let (broker_stop, stop_broker) = bounded(1);
     let ctx = Context {
         broker: broker_tx.clone(),
         broker_stop,
