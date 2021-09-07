@@ -61,6 +61,7 @@ pub trait Reader: Sized {
                 }
             }
         }
+        
         {
             let mut guard = ctx.lock().await;
             if let Some(broker_stop) = guard.broker_stop.take() {

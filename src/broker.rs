@@ -92,9 +92,10 @@ pub trait Broker: Sized {
             let mut guard = ctx.lock().await;
             // Stop the reader
             if let Some(reader_stop) = guard.reader_stop.take() {
-                let _ = reader_stop.send(());
+                if reader_stop.send(()).is_ok() {
+                    reader_handle.await;
+                }
             }
-            
         }
 
         #[cfg(feature = "debug")]
