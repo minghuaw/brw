@@ -33,36 +33,37 @@ pub use writer::Writer;
 pub use builder::Builder;
 
 /// Tells whether the loop should continue
-pub enum Running<T> {
+pub enum Running<T, E> {
     /// Continue running
     Continue(T),
     /// Stop running
-    Stop,
+    Stop(Result<(), E>),
 }
 
-impl<T> From<Option<T>> for Running<T> {
-    fn from(val: Option<T>) -> Self {
-        match val {
-            Some(inner) => Self::Continue(inner),
-            None => Self::Stop
-        }
-    }
-}
+// impl<T, E> From<Option<T>> for Running<T, E> {
+//     fn from(val: Option<T>) -> Self {
+//         match val {
+//             Some(inner) => Self::Continue(inner),
+//             None => Self::Stop
+//         }
+//     }
+// }
 
-impl<T, E> From<Result<T, E>> for Running<Result<T, E>> {
-    fn from(res: Result<T, E>) -> Self {
-        Running::Continue(res)
-    }
-}
+// impl<T, E> From<Result<T, E>> for Running<Result<T, E>, Result<T, E>> {
+//     fn from(res: Result<T, E>) -> Self {
+//         Running::Continue(res)
+//     }
+// }
 
-impl<T> From<Running<T>> for Option<T> {
-    fn from(val: Running<T>) -> Self {
-        match val {
-            Running::Continue(inner) => Some(inner),
-            Running::Stop => None
-        }
-    }
-}
+// impl<T> From<Running<T>> for Option<T> {
+//     fn from(val: Running<T>) -> Self {
+//         match val {
+//             Running::Continue(inner) => Some(inner),
+//             Running::Stop => None
+//         }
+//     }
+// }
+
 /// Context of broker-reader-writer
 pub struct Context<BI> {
     /// Sender to broker
@@ -78,7 +79,7 @@ pub struct Context<BI> {
     all(feature = "tokio", not(feature = "async-std"))
 ))]
 pub fn spawn<B, R, W, BI, WI>(broker: B, reader: R, writer: W, bound: usize
-) -> (tokio::task::JoinHandle<()>, Sender<BI>) 
+) -> (tokio::task::JoinHandle<Result<(), B::Error>>, Sender<BI>) 
 where 
     B: Broker<Item = BI, WriterItem = WI> + Send + 'static,
     R: Reader<BrokerItem = BI> + Send + 'static,

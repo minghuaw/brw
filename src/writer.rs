@@ -18,12 +18,12 @@ pub trait Writer: Sized {
     type Error: std::error::Error + Send;
 
     /// The operation to perform
-    async fn op(&mut self, item: Self::Item) -> Running<Result<Self::Ok, Self::Error>>;
+    async fn op(&mut self, item: Self::Item) -> Running<Result<Self::Ok, Self::Error>, ()>;
 
     /// Handles the result of each op
     /// 
     /// Returns a `None` to stop the whole loop
-    async fn handle_result(res: Result<Self::Ok, Self::Error>) -> Running<()> {
+    async fn handle_result(res: Result<Self::Ok, Self::Error>) -> Running<(), ()> {
         if let Err(_err) = res {
             #[cfg(feature = "debug")]
             log::error!("{:?}", _err);
@@ -40,10 +40,10 @@ pub trait Writer: Sized {
                 Running::Continue(res) => {
                     match <Self as Writer>::handle_result(res).await {
                         Running::Continue(_) => { },
-                        Running::Stop => break
+                        Running::Stop(_) => break
                     }
                 },
-                Running::Stop => break
+                Running::Stop(_) => break
             }
         }
 
@@ -75,13 +75,13 @@ mod tests {
         type Ok = ();
         type Error = std::io::Error;
 
-        async fn op(&mut self, item: Self::Item) -> Running<Result<Self::Ok, Self::Error>> {
+        async fn op(&mut self, item: Self::Item) -> Running<Result<Self::Ok, Self::Error>, ()> {
             println!("{:?}", item);
 
             Running::Continue(Ok(()))
         }
 
-        async fn handle_result(res: Result<Self::Ok, Self::Error>) -> Running<()> {
+        async fn handle_result(res: Result<Self::Ok, Self::Error>) -> Running<(), ()> {
             if let Err(err) = res {
                 println!("{:?}", err);
             }
