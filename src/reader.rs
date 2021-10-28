@@ -34,7 +34,7 @@ pub trait Reader: Sized {
         Running::Continue(())
     }
     /// Runs the operation in a loop
-    async fn reader_loop<B>(mut self, ctx: Arc<Context<Self::BrokerItem>>, mut broker: B, mut stop: flume::Receiver<()>) -> Result<(), Self::Error>
+    async fn reader_loop<B>(mut self, ctx: Arc<Context<Self::BrokerItem>>, mut broker: B, stop: flume::Receiver<()>) -> Result<(), Self::Error>
     where 
         B: Sink<Self::BrokerItem, Error = flume::SendError<Self::BrokerItem>> + Send + Unpin
     {

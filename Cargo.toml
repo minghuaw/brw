@@ -16,7 +16,7 @@ rustdoc-args = ["--cfg", "feature=\"docs\""]
 
 [features]
 
-default = ["async-std"]
+default = ["tokio"]
 
 docs = []
 builder = []
