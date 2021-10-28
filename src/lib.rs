@@ -119,7 +119,7 @@ where
 /// Spawning a broker-reader-writer with `async-std` runtime
 #[cfg(all(feature = "async-std", not(feature = "tokio")))]
 pub fn spawn<B, R, W, BI, WI>(broker: B, reader: R, writer: W
-) -> (async_std::task::JoinHandle<()>, Sender<BI>) 
+) -> (async_std::task::JoinHandle<Result<(), B::Error>>, Sender<BI>) 
 where 
     B: Broker<Item = BI, WriterItem = WI> + Send + 'static,
     R: Reader<BrokerItem = BI> + Send + 'static,
