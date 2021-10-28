@@ -1,6 +1,6 @@
 [package]
 name = "brw"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2018"
 description = "A simple builder for the broker-reader-writer pattern"
 license = "MIT/Apache-2.0"
@@ -16,7 +16,7 @@ rustdoc-args = ["--cfg", "feature=\"docs\""]
 
 [features]
 
-default = []
+default = ["tokio"]
 
 docs = []
 builder = []

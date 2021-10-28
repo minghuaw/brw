@@ -71,7 +71,7 @@ pub struct Context<BI> {
     all(feature = "tokio", not(feature = "async-std"))
 ))]
 pub fn spawn<B, R, W, BI, WI>(broker: B, reader: R, writer: W
-) -> (tokio::task::JoinHandle<()>, Sender<BI>) 
+) -> (tokio::task::JoinHandle<Result<(), B::Error>>, Sender<BI>) 
 where 
     B: Broker<Item = BI, WriterItem = WI> + Send + 'static,
     R: Reader<BrokerItem = BI> + Send + 'static,

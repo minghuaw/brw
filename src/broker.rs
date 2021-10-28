@@ -1,7 +1,6 @@
 //! Broker trait definition
 use std::sync::Arc;
 use async_trait::async_trait;
-use flume::Receiver;
 use futures::{Future, FutureExt, sink::{Sink}, stream::{Stream, StreamExt}};
 
 use super::{Running, Context};
@@ -41,19 +40,20 @@ pub trait Broker: Sized {
     }
 
     /// Runs the operation in a loop
-    async fn broker_loop<S, W, H>(
+    async fn broker_loop<S, W, RH, WH>(
         mut self, 
         mut items: S, 
         mut writer: W, 
         ctx: Arc<Context<Self::Item>>,
-        stop: Receiver<()>,
-        reader_handle: H, 
-        writer_handle: H
+        stop: flume::Receiver<()>,
+        reader_handle: RH, 
+        writer_handle: WH
     ) -> Result<(), Self::Error>
     where 
         S: Stream<Item = Self::Item> + Send + Unpin,
         W: Sink<Self::WriterItem, Error = flume::SendError<Self::WriterItem>> + Send + Unpin,
-        H: Future + Send,
+        RH: Future + Send,
+        WH: Future + Send,
     {
         let this = &mut self;
         let f = Self::handle_result;

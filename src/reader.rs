@@ -4,7 +4,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use futures::{
     sink::{Sink},
-    FutureExt
+    FutureExt,
 };
 
 use super::{Running, Context};
@@ -34,7 +34,7 @@ pub trait Reader: Sized {
         Running::Continue(())
     }
     /// Runs the operation in a loop
-    async fn reader_loop<B>(mut self, ctx: Arc<Context<Self::BrokerItem>>, mut broker: B, stop: flume::Receiver<()>) -> Result<(), Self::Error>
+    async fn reader_loop<B>(mut self, ctx: Arc<Context<Self::BrokerItem>>, mut broker: B, mut stop: flume::Receiver<()>) -> Result<(), Self::Error>
     where 
         B: Sink<Self::BrokerItem, Error = flume::SendError<Self::BrokerItem>> + Send + Unpin
     {
@@ -69,7 +69,7 @@ pub trait Reader: Sized {
             }
         }
         if !ctx.broker_stop.is_disconnected() {
-            if ctx.broker_stop.send(()).is_ok() { }
+            if ctx.broker_stop.send_async(()).await.is_ok() { }
         }
 
         #[cfg(feature = "debug")]
