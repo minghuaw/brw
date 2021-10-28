@@ -20,13 +20,13 @@ pub trait Reader: Sized {
     type Error: std::error::Error + Send;
 
     /// The operation to perform
-    async fn op<B>(&mut self, broker: B) -> Running<Result<Self::Ok, Self::Error>>
+    async fn op<B>(&mut self, broker: B) -> Running<Result<Self::Ok, Self::Error>, Option<Self::Error>>
     where B: Sink<Self::BrokerItem, Error = flume::SendError<Self::BrokerItem>> + Send + Unpin;
 
     /// Handles the result of each op
     /// 
     /// Returns a `None` to stop the whole loop
-    async fn handle_result(res: Result<Self::Ok, Self::Error>) -> Running<()> {
+    async fn handle_result(res: Result<Self::Ok, Self::Error>) -> Running<(), Option<Self::Error>> {
         if let Err(_err) = res {
             #[cfg(feature = "debug")]
             log::error!("{:?}", _err);
@@ -34,7 +34,7 @@ pub trait Reader: Sized {
         Running::Continue(())
     }
     /// Runs the operation in a loop
-    async fn reader_loop<B>(mut self, ctx: Arc<Context<Self::BrokerItem>>, mut broker: B, stop: flume::Receiver<()>)
+    async fn reader_loop<B>(mut self, ctx: Arc<Context<Self::BrokerItem>>, mut broker: B, stop: flume::Receiver<()>) -> Result<(), Self::Error>
     where 
         B: Sink<Self::BrokerItem, Error = flume::SendError<Self::BrokerItem>> + Send + Unpin
     {
@@ -50,10 +50,20 @@ pub trait Reader: Sized {
                         Running::Continue(res) => {
                             match f(res).await {
                                 Running::Continue(_) => { },
-                                Running::Stop => break
+                                Running::Stop(e) => {
+                                    match e {
+                                        None => return Ok(()),
+                                        Some(err) => return Err(err),
+                                    }
+                                }
                             }
                         },
-                        Running::Stop => break
+                        Running::Stop(e) => {
+                            match e {
+                                None => return Ok(()),
+                                Some(err) => return Err(err),
+                            }
+                        }
                     }
                 }
             }
@@ -64,5 +74,7 @@ pub trait Reader: Sized {
 
         #[cfg(feature = "debug")]
         log::debug!("Exiting reader loop");
+
+        Ok(())
     }
 }
