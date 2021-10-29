@@ -16,7 +16,7 @@ rustdoc-args = ["--cfg", "feature=\"docs\""]
 
 [features]
 
-default = ["tokio"]
+default = []
 
 docs = []
 builder = []
